@@ -40,6 +40,6 @@ jobs:
 
       - name: 验证镜像能运行（可选，加分项）
         run: |
-          docker run -d -p 5000:80 my-dotnet8-api:demo
+          docker run -d -p 80:80 my-dotnet8-api:demo
           sleep 10  # 等10秒让服务启动
-          curl http://localhost:5000/api/health  # 假设你项目有健康检查接口，验证能访问      
+          curl http://localhost/api/health  # 假设你项目有健康检查接口，验证能访问      
