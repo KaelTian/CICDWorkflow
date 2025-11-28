@@ -1,0 +1,45 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+  pack-docker:  # 第二步：补Docker环节（岗位需要的新技能）
+    needs: build  # 必须等上面的构建+测试通过，才会执行
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 构建Docker镜像
+        run: |
+          # 简单打包Docker镜像（不用推到仓库，面试时演示“能构建”就行）
+          docker build -t my-dotnet8-api:demo .  # 镜像名随便取，能识别就行
+
+      - name: 验证镜像能运行（可选，加分项）
+        run: |
+          docker run -d -p 5000:80 my-dotnet8-api:demo
+          sleep 10  # 等10秒让服务启动
+          curl http://localhost:5000/api/health  # 假设你项目有健康检查接口，验证能访问      
