@@ -26,20 +26,45 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
-  pack-docker:  # 第二步：补Docker环节（岗位需要的新技能）
-    needs: build  # 必须等上面的构建+测试通过，才会执行
+  pack-docker:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
-
+  
       - name: 构建Docker镜像
         run: |
-          # 简单打包Docker镜像（不用推到仓库，面试时演示“能构建”就行）
-          docker build -t my-dotnet8-api:demo ./CICDDemo  # 镜像名随便取，能识别就行
-
-      - name: 验证镜像能运行（可选，加分项）
+          docker build -t my-dotnet8-api:demo ./CICDDemo  # 确保 Dockerfile 在 CICDDemo 目录下
+  
+      - name: 启动容器并验证服务
         run: |
-          docker run -d -p 80:80 my-dotnet8-api:demo
-          sleep 10  # 等10秒让服务启动
-          curl http://localhost/api/health  # 假设你项目有健康检查接口，验证能访问      
+          # 启动容器（指定监听地址、命名容器方便调试）
+          docker run -d -p 80:80 -e ASPNETCORE_URLS=http://0.0.0.0:80 --name dotnet-demo-api my-dotnet8-api:demo
+          
+          # 循环重试 30 秒（每 3 秒一次）
+          echo "等待服务启动，开始重试..."
+          for i in {1..10}; do
+            # 尝试访问健康检查接口（根据实际路径修改）
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost/api/health | grep -q "200"; then
+              echo "✅ 服务启动成功，健康检查通过！"
+              docker logs dotnet-demo-api  # 可选：输出日志确认
+              exit 0
+            fi
+            echo "🔄 第 $i 次重试（共 10 次），等待 3 秒..."
+            sleep 3
+          done
+          
+          # 失败时输出调试信息
+          echo "❌ 服务启动失败！"
+          echo "容器日志："
+          docker logs dotnet-demo-api
+          echo "容器状态："
+          docker ps -a
+          exit 1
+  
+      - name: 清理资源（可选）
+        if: always()  # 无论成功失败都清理
+        run: |
+          docker stop dotnet-demo-api || true
+          docker rm dotnet-demo-api || true  
