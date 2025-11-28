@@ -36,7 +36,7 @@ jobs:
       - name: 构建Docker镜像
         run: |
           # 简单打包Docker镜像（不用推到仓库，面试时演示“能构建”就行）
-          docker build -t my-dotnet8-api:demo .  # 镜像名随便取，能识别就行
+          docker build -t my-dotnet8-api:demo ./CICDDemo  # 镜像名随便取，能识别就行
 
       - name: 验证镜像能运行（可选，加分项）
         run: |
