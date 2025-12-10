@@ -1,0 +1,70 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+  pack-docker:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+  
+      - name: 构建Docker镜像
+        run: |
+          docker build -t my-dotnet8-api:demo ./CICDDemo  # 确保 Dockerfile 在 CICDDemo 目录下
+  
+      - name: 启动容器并验证服务
+        run: |
+          # 启动容器（指定监听地址、命名容器方便调试）
+          docker run -d -p 80:80 -e ASPNETCORE_URLS=http://0.0.0.0:80 --name dotnet-demo-api my-dotnet8-api:demo
+          
+          # 循环重试 30 秒（每 3 秒一次）
+          echo "等待服务启动，开始重试..."
+          for i in {1..10}; do
+            # 尝试访问健康检查接口（根据实际路径修改）
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost/api/health | grep -q "200"; then
+              echo "✅ 服务启动成功，健康检查通过！"
+              docker logs dotnet-demo-api  # 可选：输出日志确认
+              exit 0
+            fi
+            echo "🔄 第 $i 次重试（共 10 次），等待 3 秒..."
+            sleep 3
+          done
+          
+          # 失败时输出调试信息
+          echo "❌ 服务启动失败！"
+          echo "容器日志："
+          docker logs dotnet-demo-api
+          echo "容器状态："
+          docker ps -a
+          exit 1
+  
+      - name: 清理资源（可选）
+        if: always()  # 无论成功失败都清理
+        run: |
+          docker stop dotnet-demo-api || true
+          docker rm dotnet-demo-api || true  
